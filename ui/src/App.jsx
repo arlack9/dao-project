@@ -1,377 +1,341 @@
-import { useState } from "react";
-import * as React from "react";
-import { id, Interface, Contract, BrowserProvider } from "ethers";
-
-import {
-  CertAddr,
-  MyGovernorAddr,
-} from "./contract-data/deployedAddresses.json";
+import { useState, useEffect } from "react";
+import { Contract, BrowserProvider } from "ethers";
+import { CertAddr, MyGovernorAddr } from "./contract-data/deployedAddresses.json";
 import { abi as Govabi } from "./contract-data/MyGovernor.json";
 import { abi as Certabi } from "./contract-data/Cert.json";
+import {
+  AppBar,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Container,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Grid,
+  Paper,
+  TextField,
+  Toolbar,
+  Typography,
+  Chip,
+  createTheme,
+  ThemeProvider
+} from '@mui/material';
+import { styled } from '@mui/material/styles';
+import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
+import HowToVoteIcon from '@mui/icons-material/HowToVote';
+import GroupIcon from '@mui/icons-material/Group';
+import AddIcon from '@mui/icons-material/Add';
 
-import AppBar from "@mui/material/AppBar";
-import Box from "@mui/material/Box";
-import Toolbar from "@mui/material/Toolbar";
-import Typography from "@mui/material/Typography";
-import Button from "@mui/material/Button";
-import IconButton from "@mui/material/IconButton";
-import MenuIcon from "@mui/icons-material/Menu";
+const lightTheme = createTheme({
+  palette: {
+    mode: 'light',
+    primary: {
+      main: '#3b82f6',
+      light: '#60a5fa',
+      dark: '#2563eb',
+    },
+    secondary: {
+      main: '#7c3aed',
+      light: '#8b5cf6',
+      dark: '#6d28d9',
+    },
+    background: {
+      default: '#f8fafc',
+      paper: '#ffffff',
+    },
+    text: {
+      primary: '#1e293b',
+      secondary: '#64748b',
+    },
+  },
+  typography: {
+    fontFamily: "'Inter', sans-serif",
+  },
+  components: {
+    MuiCard: {
+      styleOverrides: {
+        root: {
+          boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
+          border: '1px solid #e2e8f0',
+        },
+      },
+    },
+    MuiButton: {
+      styleOverrides: {
+        root: {
+          textTransform: 'none',
+          fontWeight: 600,
+          fontSize: '0.95rem',
+          boxShadow: 'none',
+        },
+      },
+    },
+  },
+});
 
-import Accordion from "@mui/material/Accordion";
-import AccordionSummary from "@mui/material/AccordionSummary";
-import AccordionDetails from "@mui/material/AccordionDetails";
-import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
+const GradientButton = styled(Button)({
+  background: 'linear-gradient(135deg, #3b82f6 0%, #7c3aed 100%)',
+  color: 'white',
+  padding: '8px 24px',
+  '&:hover': {
+    background: 'linear-gradient(135deg, #2563eb 0%, #6d28d9 100%)',
+  },
+});
 
-import Card from "@mui/material/Card";
-import CardActions from "@mui/material/CardActions";
-import CardContent from "@mui/material/CardContent";
-
-import Chip from "@mui/material/Chip";
-
-import { experimentalStyled as styled } from "@mui/material/styles";
-import Paper from "@mui/material/Paper";
-import Grid from "@mui/material/Grid";
-
-import TextField from "@mui/material/TextField";
-import Dialog from "@mui/material/Dialog";
-import DialogActions from "@mui/material/DialogActions";
-import DialogContent from "@mui/material/DialogContent";
-import DialogContentText from "@mui/material/DialogContentText";
-import DialogTitle from "@mui/material/DialogTitle";
-
-import MenuItem from "@mui/material/MenuItem";
-import Select from "@mui/material/Select";
-
-function App() {
+const App = () => {
   const [loginState, setLoginState] = useState("Connect");
-  const [proposals, setProposals] = useState([
-    ['No Prosposals', '']
-  ]);
+  const [proposals, setProposals] = useState([]);
   const [pDescription, setPDescription] = useState('');
+  const [votingPower, setVotingPower] = useState(100);
+  const [balance, setBalance] = useState(1000);
+  const [open, setOpen] = useState(false);
 
   const provider = new BrowserProvider(window.ethereum);
-  console.log("Provider:", provider);
 
-  const handleSubmit = async (event) => {
-    const signer = await provider.getSigner();
-    const Govinstance = new Contract(MyGovernorAddr, Govabi, signer);
-    const Certinstance = new Contract(CertAddr, Certabi, signer);
+  useEffect(() => {
+    getEvents();
+  }, []);
 
-    let paramsArray = [104, "An", "EDP", "A", "25th June"];
-
-    const transferCalldata = Certinstance.interface.encodeFunctionData(
-      "issue",
-      paramsArray
-    );
-
+  const handleSubmit = async () => {
     try {
-      // Propose the transaction
-      const proposeTx = await Govinstance.propose(
-        [CertAddr],
-        [0],
-        [transferCalldata],
-        pDescription
-      );
+      const signer = await provider.getSigner();
+      const Govinstance = new Contract(MyGovernorAddr, Govabi, signer);
+      const Certinstance = new Contract(CertAddr, Certabi, signer);
+      const paramsArray = [104, "An", "EDP", "A", "25th June"];
+      const transferCalldata = Certinstance.interface.encodeFunctionData("issue", paramsArray);
+      const proposeTx = await Govinstance.propose([CertAddr], [0], [transferCalldata], pDescription);
       await proposeTx.wait();
-      console.log("Proposal transaction successful:", proposeTx.hash);
       getEvents();
-      handleClose();
+      setOpen(false);
     } catch (error) {
-      console.error("Error proposing transaction:", error);
+      console.error("Error:", error);
     }
   };
 
-  const getEvents = async (event) => {
-    let eventlogs = [];
-
-    const signer = await provider.getSigner();
-    const Govinstance = new Contract(MyGovernorAddr, Govabi, signer);
-
-    const filter = Govinstance.filters.ProposalCreated();
-    const events = await Govinstance.queryFilter(filter);
-    console.log("ProposalCreated events:", events);
-
-    events.forEach((event) => {
-      eventlogs.push([event.args[0].toString(), event.args[8]]);
-    });
-    setProposals(eventlogs);
-    console.log(eventlogs);
+  const getEvents = async () => {
+    try {
+      const signer = await provider.getSigner();
+      const Govinstance = new Contract(MyGovernorAddr, Govabi, signer);
+      const filter = Govinstance.filters.ProposalCreated();
+      const events = await Govinstance.queryFilter(filter);
+      const eventlogs = events.map(event => ({
+        proposalId: event.args.proposalId.toString(),
+        proposer: event.args.proposer,
+        targets: event.args.targets,
+        values: event.args.values,
+        calldatas: event.args.calldatas,
+        description: event.args.description
+      }));
+      console.log("Fetched proposals:", eventlogs);
+      setProposals(eventlogs);
+    } catch (error) {
+      console.error("Error fetching events:", error);
+    }
   };
 
-  async function connectMetaMask() {
-    const signer = await provider.getSigner();
-    alert(`Successfully Connected ${signer.address}`);
-    setLoginState("Connected");
-  }
-
-  const [open, setOpen] = React.useState(false);
-
-  const handleClickOpen = () => {
-    setOpen(true);
+  const connectMetaMask = async () => {
+    try {
+      const signer = await provider.getSigner();
+      setLoginState("Connected");
+      alert(`Successfully Connected ${signer.address}`);
+    } catch (error) {
+      console.error("Connection error:", error);
+    }
   };
 
-  const handleClose = () => {
-    setOpen(false);
+  const handleVoteFor = async (proposalId) => {
+    try {
+      const signer = await provider.getSigner();
+      const Govinstance = new Contract(MyGovernorAddr, Govabi, signer);
+      const voteTx = await Govinstance.castVote(proposalId, 1); // 1 for "For"
+      await voteTx.wait();
+      alert("Vote For submitted successfully");
+    } catch (error) {
+      console.error("Error voting for:", error);
+    }
   };
 
-  const handlePDesChange = (event) => {
-    setPDescription(event.target.value);
+  const handleVoteAgainst = async (proposalId) => {
+    try {
+      const signer = await provider.getSigner();
+      const Govinstance = new Contract(MyGovernorAddr, Govabi, signer);
+      const voteTx = await Govinstance.castVote(proposalId, 0); // 0 for "Against"
+      await voteTx.wait();
+      alert("Vote Against submitted successfully");
+    } catch (error) {
+      console.error("Error voting against:", error);
+    }
+  };
+
+  const handleExecute = async (proposalId) => {
+    try {
+      const signer = await provider.getSigner();
+      const Govinstance = new Contract(MyGovernorAddr, Govabi, signer);
+      const executeTx = await Govinstance.execute(proposalId);
+      await executeTx.wait();
+      alert("Proposal executed successfully");
+    } catch (error) {
+      console.error("Error executing proposal:", error);
+    }
   };
 
   return (
-    <>
-      <Box sx={{ flexGrow: 1 }}>
-        <AppBar position="static">
+    <ThemeProvider theme={lightTheme}>
+      <Box sx={{ bgcolor: 'background.default', minHeight: '100vh' }}>
+        <AppBar position="fixed" elevation={0} color="inherit">
           <Toolbar>
-            <IconButton
-              size="large"
-              edge="start"
-              color="inherit"
-              aria-label="menu"
-              sx={{ mr: 2 }}
-            >
-              <MenuIcon />
-            </IconButton>
-            <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-              DAO: Certi App
+            <AccountBalanceIcon sx={{ mr: 2, color: 'primary.main' }} />
+            <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 600, color: 'text.primary' }}>
+              DAO Governance
             </Typography>
-            <Button color="inherit" onClick={connectMetaMask}>
-              <b>{loginState}</b>
-            </Button>
+            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+              <Chip
+                icon={<HowToVoteIcon />}
+                label={`${votingPower} VP`}
+                color="primary"
+                variant="outlined"
+              />
+              <Chip
+                icon={<AccountBalanceIcon />}
+                label={`${balance} Tokens`}
+                color="secondary"
+                variant="outlined"
+              />
+              <GradientButton onClick={connectMetaMask}>
+                {loginState}
+              </GradientButton>
+            </Box>
           </Toolbar>
         </AppBar>
-      </Box>
-      <br></br>
-      <Button variant="outlined" onClick={handleClickOpen}>
-        New Proposal
-      </Button>
-      <Button
-        style={{ marginLeft: "5px" }}
-        variant="outlined"
-        onClick={getEvents}
-      >
-        Events
-      </Button>
-      <h2>Active Proposals</h2>
-      <div
-        style={{
-          border: "2px solid blue",
-          padding: "10px",
-          borderRadius: "25px",
-          marginTop: "20px",
-          marginBottom: "20px",
-        }}
-      >
-        <Box sx={{ flexGrow: 1 }}>
-          <Grid
-            container
-            spacing={{ xs: 2, md: 3 }}
-            columns={{ xs: 4, sm: 8, md: 12 }}
-          >
-            {proposals.map((proposal, index) => (
-              <Grid item xs={2} sm={4} md={4}>
-                <Card sx={{ minWidth: 275 }}>
-                  <CardContent>
-                    <Typography component="div" paragraph style={{ wordWrap: 'break-word' }}>
-                      <b>Proposal ID: </b>
-                      {proposal[0]}
-                    </Typography>
 
-                    <Typography variant="body2">{proposal[1]}</Typography>
+        <Container maxWidth="lg" sx={{ pt: 12, pb: 8 }}>
+          <Box sx={{ textAlign: 'center', mb: 8 }}>
+            <Typography variant="h3" sx={{ mb: 2, fontWeight: 700 }}>
+              <span className="gradient-text">Decentralized Governance</span>
+            </Typography>
+            <Typography variant="h6" color="text.secondary" sx={{ maxWidth: '600px', mx: 'auto' }}>
+              Shape the future through transparent and secure voting
+            </Typography>
+          </Box>
+
+          <Grid container spacing={3} sx={{ mb: 6 }}>
+            {[
+              { icon: <HowToVoteIcon />, title: "Active Proposals", value: proposals.length },
+              { icon: <GroupIcon />, title: "Total Voters", value: "1,234" },
+              { icon: <AccountBalanceIcon />, title: "Voting Power", value: votingPower }
+            ].map((stat, i) => (
+              <Grid item xs={12} md={4} key={i}>
+                <Card sx={{ height: '100%' }}>
+                  <CardContent sx={{ textAlign: 'center' }}>
+                    <Box sx={{ color: 'primary.main', mb: 2 }}>
+                      {stat.icon}
+                    </Box>
+                    <Typography variant="h6" sx={{ mb: 1, color: 'text.primary' }}>
+                      {stat.title}
+                    </Typography>
+                    <Typography variant="h4" sx={{ fontWeight: 700, color: 'text.primary' }}>
+                      {stat.value}
+                    </Typography>
                   </CardContent>
-                  <CardActions>
-                    <Button variant="contained">Active</Button>
-                  </CardActions>
                 </Card>
               </Grid>
             ))}
           </Grid>
-        </Box>
-      </div>
 
-      <h2>All Proposals</h2>
-      <div
-        style={{
-          border: "2px solid blue",
-          padding: "10px",
-          borderRadius: "25px",
-          marginTop: "20px",
-          marginBottom: "20px",
-        }}
-      >
-        <Accordion defaultExpanded>
-          <AccordionSummary
-            expandIcon={<ArrowDownwardIcon />}
-            aria-controls="panel1-content"
-            id="panel1-header"
-          >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                width: "90%",
-              }}
-            >
-              <Typography>
-                <b>Proposal ID: </b>
-                40113249118907347497846265566344225737199931284307161947685216366528597413334
+          <Box sx={{ mb: 4 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+              <Typography variant="h5" sx={{ fontWeight: 600, color: 'text.primary' }}>
+                Active Proposals
               </Typography>
-              <Chip label="Success" color="primary" />
-            </div>
-          </AccordionSummary>
-          <AccordionDetails>
-            <Typography>Proposal #1: Issue certificate 101</Typography>
-          </AccordionDetails>
-        </Accordion>
-        <Accordion defaultExpanded>
-          <AccordionSummary
-            expandIcon={<ArrowDownwardIcon />}
-            aria-controls="panel1-content"
-            id="panel1-header"
-          >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                width: "90%",
-              }}
-            >
-              <Typography>
-                <b>Proposal ID: </b>
-                40113249118907347497846265566344225737199931284307161947685216366528597413334
-              </Typography>
-              <Chip label="Success" color="primary" />
-            </div>
-          </AccordionSummary>
-          <AccordionDetails>
-            <Typography>Proposal #2: Issue certificate 102</Typography>
-          </AccordionDetails>
-        </Accordion>
-        <Accordion defaultExpanded>
-          <AccordionSummary
-            expandIcon={<ArrowDownwardIcon />}
-            aria-controls="panel1-content"
-            id="panel1-header"
-          >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                width: "90%",
-              }}
-            >
-              <Typography>
-                <b>Proposal ID: </b>
-                40113249118907347497846265566344225737199931284307161947685216366528597413334
-              </Typography>
-              <Chip label="Success" color="primary" />
-            </div>
-          </AccordionSummary>
-          <AccordionDetails>
-            <Typography>Proposal #3: Issue certificate 104</Typography>
-          </AccordionDetails>
-        </Accordion>
-        <Accordion defaultExpanded>
-          <AccordionSummary
-            expandIcon={<ArrowDownwardIcon />}
-            aria-controls="panel1-content"
-            id="panel1-header"
-          >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                width: "90%",
-              }}
-            >
-              <Typography>
-                <b>Proposal ID: </b>
-                40113249118907347497846265566344225737199931284307161947685216366528597413334
-              </Typography>
-              <Chip label="Success" color="primary" />
-            </div>
-          </AccordionSummary>
-          <AccordionDetails>
-            <Typography>Proposal #4: Issue certificate 104</Typography>
-          </AccordionDetails>
-        </Accordion>
-      </div>
-      <React.Fragment>
+              <GradientButton onClick={() => setOpen(true)} startIcon={<AddIcon />}>
+                Create Proposal
+              </GradientButton>
+            </Box>
+
+            {proposals.map((proposal, index) => (
+              <Card key={index} sx={{ mb: 3 }}>
+                <CardContent>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+                    <Box>
+                      <Typography variant="h6" sx={{ mb: 1, color: 'text.primary' }}>
+                        {proposal.description}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        ID: {proposal.proposalId.slice(0, 20)}...
+                      </Typography>
+                    </Box>
+                    <Chip label="Active" color="warning" variant="outlined" />
+                  </Box>
+
+                  <Grid container spacing={3} sx={{ mb: 3 }}>
+                    <Grid item xs={12} md={4}>
+                      <Paper sx={{ p: 2, bgcolor: '#f0fdf4' }}>
+                        <Typography color="success.main">For</Typography>
+                        <Typography variant="h6" sx={{ fontWeight: 600 }}>65%</Typography>
+                      </Paper>
+                    </Grid>
+                    <Grid item xs={12} md={4}>
+                      <Paper sx={{ p: 2, bgcolor: '#fef2f2' }}>
+                        <Typography color="error.main">Against</Typography>
+                        <Typography variant="h6" sx={{ fontWeight: 600 }}>35%</Typography>
+                      </Paper>
+                    </Grid>
+                    <Grid item xs={12} md={4}>
+                      <Paper sx={{ p: 2, bgcolor: '#f8fafc' }}>
+                        <Typography color="text.secondary">Quorum</Typography>
+                        <Typography variant="h6" sx={{ fontWeight: 600 }}>75%</Typography>
+                      </Paper>
+                    </Grid>
+                  </Grid>
+
+                  <Box sx={{ display: 'flex', gap: 2 }}>
+                    <Button variant="contained" color="success" fullWidth onClick={() => handleVoteFor(proposal.proposalId)}>Vote For</Button>
+                    <Button variant="contained" color="error" fullWidth onClick={() => handleVoteAgainst(proposal.proposalId)}>Vote Against</Button>
+                    <Button variant="contained" color="info" fullWidth onClick={() => handleExecute(proposal.proposalId)}>Execute</Button>
+                  </Box>
+                </CardContent>
+              </Card>
+            ))}
+          </Box>
+        </Container>
+
         <Dialog
           open={open}
-          onClose={handleClose}
+          onClose={() => setOpen(false)}
           PaperProps={{
-            component: "form",
-            onSubmit: (event) => {
-              event.preventDefault();
-              const formData = new FormData(event.currentTarget);
-              const formJson = Object.fromEntries(formData.entries());
-              const email = formJson.email;
-              console.log(email);
-              handleClose();
-            },
+            sx: { minWidth: '400px' }
           }}
         >
-          <DialogTitle>New Proposal</DialogTitle>
+          <DialogTitle>Create New Proposal</DialogTitle>
           <DialogContent>
-            <DialogContentText>
-              Enter the details for a new proposal
-            </DialogContentText>
-            <br />
-            <Select
-              labelId="demo-simple-select-label"
-              id="demo-simple-select"
-              value="Function to Execute"
-              // onChange={handleChange}
-            >
-              <MenuItem value="Function to Execute">
-                Function to Execute
-              </MenuItem>
-              <MenuItem value="issue">issue</MenuItem>
-            </Select>
             <TextField
               autoFocus
-              required
               margin="dense"
-              id="name"
-              name="email"
-              label="Details of the Function to Execute"
-              type="email"
+              label="Proposal Description"
+              type="text"
               fullWidth
-              variant="standard"
-            />
-            <TextField
-              autoFocus
-              required
-              margin="dense"
-              id="name"
-              name="email"
-              label="Address of the contract"
-              type="email"
-              fullWidth
-              variant="standard"
-            />
-            <TextField
-              autoFocus
-              required
-              margin="dense"
-              id="name"
-              name="email"
-              label="Description"
-              type="email"
-              fullWidth
-              variant="standard"
-              onChange={handlePDesChange}
+              multiline
+              rows={4}
+              variant="outlined"
+              value={pDescription}
+              onChange={(e) => setPDescription(e.target.value)}
             />
           </DialogContent>
-          <DialogActions>
-            <Button onClick={handleClose}>Cancel</Button>
-            <Button onClick={handleSubmit}>Submit</Button>
+          <DialogActions sx={{ p: 2.5, pt: 0 }}>
+            <Button onClick={() => setOpen(false)} variant="outlined">
+              Cancel
+            </Button>
+            <GradientButton onClick={handleSubmit}>
+              Create Proposal
+            </GradientButton>
           </DialogActions>
         </Dialog>
-      </React.Fragment>
-    </>
+      </Box>
+    </ThemeProvider>
   );
-}
+};
 
 export default App;
