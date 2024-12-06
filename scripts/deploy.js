@@ -3,15 +3,6 @@ const { ethers } = require("hardhat");
 const fs = require("fs");
 
 
-async function main() {
-    // Get the deployer's account
-    const [deployer] = await ethers.getSigners();
-
-    console.log(`Deploying contracts with the account: ${deployer.address}`);
-
-    // Deploy the GovToken contract
-    const govToken = await ethers.deployContract("GovToken", [deployer.address]);
-    await govToken.waitForDeployment();
 
     console.log(`GovToken deployed to: ${govToken.target}`);
 
