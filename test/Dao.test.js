@@ -1,4 +1,18 @@
+const { network, ethers } = require("hardhat");
 
+async function moveBlocks(number) {
+    for (let index = 0; index < number; index++) {
+        await network.provider.request({
+            method: "evm_mine",
+            params: [],
+        })
+    }
+    console.log(`Moved ${number} blocks`)
+}
+
+async function moveTime(number) {
+    await network.provider.send("evm_increaseTime", [number])
+    console.log(`Moved forward in time ${number} seconds`)
 }
 
 describe("DAO Contract Testing Flow", function () {
