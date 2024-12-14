@@ -1,16 +1,6 @@
 # dao-1
 
-# installation
 
-```
-clone this repository 
-
-cd ui
-
-npm install ethers
-npm run dev to run test environment
-
-```
 
 ## Git Basic Commands for comiiting from git client
 
