@@ -1,6 +1,18 @@
 # dao-1
 
-## Git Commands
+# installation
+
+```
+clone this repository 
+
+cd ui
+
+npm install ethers
+npm run dev to run test environment
+
+```
+
+## Git Basic Commands for comiiting from git client
 
 ```
 ssh-keygen -t ed25519 -C "just a comment"
